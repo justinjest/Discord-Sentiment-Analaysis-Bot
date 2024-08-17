@@ -1,7 +1,7 @@
 import discord
 import openai
 import secret
-
+import threading
 
 # Discord API setups
 intents = discord.Intents.default()
@@ -53,11 +53,15 @@ async def on_message(message):
         await current_anger += get_openai_response(message.content)
 
 # Constantly running in one thread
-if current_anger > 5:
-    activate_timeout
-elif current_anger <= 0:
-    end_timeout
-else:
-    mood_decay(current_anger)
+def mood_management(current_anger):
+    if current_anger > 5:
+        activate_timeout
+        mood_management(current_anger)
+    elif current_anger <= 0:
+        end_timeout
+        mood_management(current_anger)
+    else:
+        mood_decay(current_anger)
+        mood_management(current_anger)
 
 client.run(secret.token)
