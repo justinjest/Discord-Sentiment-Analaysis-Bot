@@ -60,7 +60,6 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         await end_timeout(message.channel)
-        return
     else:
         await message.channel.send(get_openai_response(message.content))
         await activate_timeout(message.channel)
