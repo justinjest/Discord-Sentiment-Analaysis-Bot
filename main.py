@@ -3,6 +3,8 @@ from openai import OpenAI
 import secret
 import threading
 import time
+
+
 # Discord API setups
 intents = discord.Intents.default()
 intents.message_content = True
@@ -14,13 +16,6 @@ openai_client = OpenAI(
     api_key = secret.project_id
 )
 
-# Placeholder to prove that python scripts run within discord
-def reverse_string(input):
-    try:
-        return(input[::-1])
-    except TypeError:
-        return("Error with string, unable to reverse")
-    
 def get_openai_response(input:str) -> float:
     # TODO improve prompt to something slightly cleaner
     completion = openai_client.chat.completions.create(
@@ -35,26 +30,25 @@ def get_openai_response(input:str) -> float:
     return (completion.choices[0].message.content)
 
 async def activate_timeout(channel_name):
-    # TODO activate slow mode in discord
     await channel_name.edit(slowmode_delay=60)
     await channel_name.send("Slowmode activated due to hot heads")
 
 async def end_timeout(channel_name):
-    # TODO turn off slow mode in discord
     await channel_name.edit(slowmode_delay=0)
     await channel_name.send("Slowmode turned off")
     
 
 def mood_decay(current_anger: float) -> float:
     if current_anger > 0:
-        current_anger -= .1
-    elif current_anger < 0: 
-        current_anger += .1
+        print ("mood decays down")
+        anger_tracker(-.1) 
+    elif current_anger < 0:
+        print ("mood decays up") 
+        anger_tracker(.1)
     else:
         current_anger = 0
     return current_anger
 
-current_anger = 0
 
 # constantly running in another thread
 @client.event
@@ -64,31 +58,46 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if message.author == client.user:
-        await end_timeout(message.channel)
+        # await end_timeout(message.channel)
+        return
     else:
         response = get_openai_response(message.content)
         await message.channel.send(get_openai_response(response))
         try: 
-            current_anger += response 
+            anger_tracker(response)
         except TypeError:
             message.channel.send("Error with message content not interagable.")
-        await activate_timeout(message.channel)
+        # await activate_timeout(message.channel)
 
+# Function to keep track of a variable, insure it is initialized, and keep it in scope
+# Calling this with 0 will allow youto simply pull the value
+
+
+def anger_tracker(anger_change, current_anger = 5):
+    try:
+        current_anger += anger_change
+        return (current_anger)
+    except NameError:
+        print ("Name error")
+
+        return (current_anger)
 # Constantly running in one thread
+
 def mood_management(current_anger):
     # Really stupid way to make this wait but it is testing rn
-    time.sleep(60)
+    time.sleep(5)
+    print (f"Running mood_management, current mood is {current_anger}")
     if current_anger < 5:
-        mood_decay(current_anger)
-        activate_timeout
-        mood_management(current_anger)
+        mood_decay(anger_tracker(0))
+        # activate_timeout
+        mood_management(anger_tracker(0))
     elif current_anger >= 0:
-        end_timeout
-        mood_management(current_anger)
+        # end_timeout
+        mood_management(anger_tracker(0))
     else:
-        mood_decay(current_anger)
-        mood_management(current_anger)
+        mood_decay(anger_tracker(0))
+        mood_management(anger_tracker(0))
 
-threading.Thread(target=mood_management, args=(current_anger,)).start()
+threading.Thread(target=mood_management, args=(anger_tracker(0),)).start()
 
 client.run(secret.token)
