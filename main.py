@@ -2,7 +2,7 @@ import discord
 from openai import OpenAI
 import secret
 import threading
-
+import time
 # Discord API setups
 intents = discord.Intents.default()
 intents.message_content = True
@@ -46,8 +46,13 @@ async def end_timeout(channel_name):
     
 
 def mood_decay(current_anger: float) -> float:
-    # TODO multi threaded argument that decays the anger level over time
-    return
+    if current_anger > 0:
+        current_anger -= .1
+    elif current_anger < 0: 
+        current_anger += .1
+    else:
+        current_anger = 0
+    return current_anger
 
 current_anger = 0
 
@@ -61,20 +66,29 @@ async def on_message(message):
     if message.author == client.user:
         await end_timeout(message.channel)
     else:
-        await message.channel.send(get_openai_response(message.content))
+        response = get_openai_response(message.content)
+        await message.channel.send(get_openai_response(response))
+        try: 
+            current_anger += response 
+        except TypeError:
+            message.channel.send("Error with message content not interagable.")
         await activate_timeout(message.channel)
 
 # Constantly running in one thread
 def mood_management(current_anger):
-    if current_anger > 5:
+    # Really stupid way to make this wait but it is testing rn
+    time.sleep(60)
+    if current_anger < 5:
         mood_decay(current_anger)
         activate_timeout
         mood_management(current_anger)
-    elif current_anger <= 0:
+    elif current_anger >= 0:
         end_timeout
         mood_management(current_anger)
     else:
         mood_decay(current_anger)
         mood_management(current_anger)
+
+threading.Thread(target=mood_management, args=(current_anger,)).start()
 
 client.run(secret.token)
