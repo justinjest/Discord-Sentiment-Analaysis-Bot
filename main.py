@@ -57,16 +57,16 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if message.author == client.user:
-        # await end_timeout(message.channel)
         return
     else:
         response = get_openai_response(message.content)
+        print(f"New current_anger is {tracker.current_anger}")
         await message.channel.send(get_openai_response(response))
         try: 
-            tracker.track(response)
+            tracker.track(float(response))
         except TypeError:
-            message.channel.send("Error with message content not interagable.")
-        # await activate_timeout(message.channel)
+            await message.channel.send("Error with message content not interagable.")
+
 
 # Function to keep track of a variable, insure it is initialized, and keep it in scope
 # Calling this with 0 will allow youto simply pull the value
@@ -85,7 +85,7 @@ def anger_tracker(anger_change, current_anger = 5):
 # From GPT
 class AngerTracker:
     def __init__(self):
-        self.current_anger = -5
+        self.current_anger = 0
     
     def track(self, anger_change):
         self.current_anger += anger_change
@@ -97,14 +97,14 @@ tracker = AngerTracker()
 # Constantly running in one thread
 
 def mood_management(current_anger):
-    # Really stupid way to make this wait but it is testing rn
-    time.sleep(4)
     print (f"Running mood_management, current mood is {current_anger}")
-    if current_anger > 4:
+    # Really stupid way to make this wait but it is testing rn
+    time.sleep(10)
+    if current_anger < -4:
         mood_decay(tracker.current_anger)
         # activate_timeout
         mood_management(tracker.current_anger)
-    elif current_anger <= 0:
+    elif current_anger >= 0:
         mood_decay(tracker.current_anger)
         # end_timeout
         mood_management(tracker.current_anger)
