@@ -19,7 +19,7 @@ openai_client = OpenAI(
 # From GPT
 class AngerTracker:
     def __init__(self):
-        self.current_anger = -5
+        self.current_anger = 0
     
     def track(self, anger_change):
         self.current_anger += anger_change
@@ -52,7 +52,7 @@ def mood_decay(current_anger: float) -> float:
 def mood_management(current_anger):
     print (f"Running mood_management, current mood is {current_anger}")
     # Really stupid way to make this wait but it is testing rn
-    time.sleep(10)
+    time.sleep(60)
     if current_anger < -4:
         print ("Mood below -4")
         mood_decay(tracker.current_anger)
@@ -109,10 +109,10 @@ async def on_message(message):
             print(f"New current_anger is {tracker.current_anger}")
         except TypeError:
             await message.channel.send("Error with message content not interagable.")
-    print (f"Slow mode is currently {slow.slow_mode_change}")
-    if slow.slow_mode_change == True:
+    print (f"Slow mode is currently {slow.slow_mode}")
+    if slow.slow_mode == True:
         await activate_timeout(message.channel)
-    elif slow.slow_mode_change == False:
+    elif slow.slow_mode == False:
         await end_timeout(message.channel)
 
 
