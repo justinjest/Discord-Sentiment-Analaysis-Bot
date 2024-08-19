@@ -15,7 +15,58 @@ client = discord.Client(intents=intents)
 openai_client = OpenAI(
     api_key = secret.project_id
 )
+# Keeps track of anger and is critical function for this program
+# From GPT
+class AngerTracker:
+    def __init__(self):
+        self.current_anger = -5
+    
+    def track(self, anger_change):
+        self.current_anger += anger_change
+        return self.current_anger
 
+tracker = AngerTracker()
+
+class slowMode:
+    def __init__(self):
+        self.slow_mode = False
+
+    def slow_mode_change(self, slow_mode_on):
+        self.slow_mode = slow_mode_on
+
+slow = slowMode()
+
+        
+# mood functions
+def mood_decay(current_anger: float) -> float:
+    # print ("Mood decay active")
+    if tracker.current_anger > 0:
+        # print ("mood decays down")
+        tracker.track(-.1) 
+    elif tracker.current_anger < 0:
+        # print ("mood decays up") 
+        tracker.track(.1)
+    return current_anger
+
+# Constantly running in one thread
+def mood_management(current_anger):
+    print (f"Running mood_management, current mood is {current_anger}")
+    # Really stupid way to make this wait but it is testing rn
+    time.sleep(10)
+    if current_anger < -4:
+        print ("Mood below -4")
+        mood_decay(tracker.current_anger)
+        slow.slow_mode_change(True)
+        mood_management(tracker.current_anger)
+    elif current_anger >= 0:
+        mood_decay(tracker.current_anger)
+        slow.slow_mode_change(False) 
+        mood_management(tracker.current_anger)
+    else:
+        mood_decay(tracker.current_anger)
+        mood_management(tracker.current_anger)
+
+# OpenAI functions
 def get_openai_response(input:str) -> float:
     # TODO improve prompt to something slightly cleaner
     completion = openai_client.chat.completions.create(
@@ -29,25 +80,17 @@ def get_openai_response(input:str) -> float:
     )
     return (completion.choices[0].message.content)
 
+# Discord functions
 async def activate_timeout(channel_name):
+    print ("Timeout activated")
     await channel_name.edit(slowmode_delay=60)
     await channel_name.send("Slowmode activated due to hot heads")
 
 async def end_timeout(channel_name):
+    print ("Timeout ended")
     await channel_name.edit(slowmode_delay=0)
     await channel_name.send("Slowmode turned off")
     
-
-def mood_decay(current_anger: float) -> float:
-    print ("Mood decay active")
-    if tracker.current_anger > 0:
-        print ("mood decays down")
-        tracker.track(-.1) 
-    elif tracker.current_anger < 0:
-        print ("mood decays up") 
-        tracker.track(.1)
-    return current_anger
-
 
 # constantly running in another thread
 @client.event
@@ -60,58 +103,18 @@ async def on_message(message):
         return
     else:
         response = get_openai_response(message.content)
-        print(f"New current_anger is {tracker.current_anger}")
         await message.channel.send(get_openai_response(response))
         try: 
             tracker.track(float(response))
+            print(f"New current_anger is {tracker.current_anger}")
         except TypeError:
             await message.channel.send("Error with message content not interagable.")
+    print (f"Slow mode is currently {slow.slow_mode_change}")
+    if slow.slow_mode_change == True:
+        await activate_timeout(message.channel)
+    elif slow.slow_mode_change == False:
+        await end_timeout(message.channel)
 
-
-# Function to keep track of a variable, insure it is initialized, and keep it in scope
-# Calling this with 0 will allow youto simply pull the value
-
-
-"""
-def anger_tracker(anger_change, current_anger = 5):
-    try:
-        current_anger += anger_change
-        return (current_anger)
-    except NameError:
-        print ("Name error")
-
-        return (current_anger)
-"""
-# From GPT
-class AngerTracker:
-    def __init__(self):
-        self.current_anger = 0
-    
-    def track(self, anger_change):
-        self.current_anger += anger_change
-        return self.current_anger
-
-tracker = AngerTracker()
-
-
-# Constantly running in one thread
-
-def mood_management(current_anger):
-    print (f"Running mood_management, current mood is {current_anger}")
-    # Really stupid way to make this wait but it is testing rn
-    time.sleep(10)
-    if current_anger < -4:
-        mood_decay(tracker.current_anger)
-        # activate_timeout
-        mood_management(tracker.current_anger)
-    elif current_anger >= 0:
-        mood_decay(tracker.current_anger)
-        # end_timeout
-        mood_management(tracker.current_anger)
-    else:
-        mood_decay(tracker.current_anger)
-        mood_management(tracker.current_anger)
 
 threading.Thread(target=mood_management, args=(tracker.current_anger,)).start()
-
 client.run(secret.token)
