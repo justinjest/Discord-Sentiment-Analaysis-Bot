@@ -39,14 +39,13 @@ async def end_timeout(channel_name):
     
 
 def mood_decay(current_anger: float) -> float:
-    if current_anger > 0:
+    print ("Mood decay active")
+    if tracker.current_anger > 0:
         print ("mood decays down")
-        anger_tracker(-.1) 
-    elif current_anger < 0:
+        tracker.track(-.1) 
+    elif tracker.current_anger < 0:
         print ("mood decays up") 
-        anger_tracker(.1)
-    else:
-        current_anger = 0
+        tracker.track(.1)
     return current_anger
 
 
@@ -64,7 +63,7 @@ async def on_message(message):
         response = get_openai_response(message.content)
         await message.channel.send(get_openai_response(response))
         try: 
-            anger_tracker(response)
+            tracker.track(response)
         except TypeError:
             message.channel.send("Error with message content not interagable.")
         # await activate_timeout(message.channel)
@@ -73,6 +72,7 @@ async def on_message(message):
 # Calling this with 0 will allow youto simply pull the value
 
 
+"""
 def anger_tracker(anger_change, current_anger = 5):
     try:
         current_anger += anger_change
@@ -81,23 +81,37 @@ def anger_tracker(anger_change, current_anger = 5):
         print ("Name error")
 
         return (current_anger)
+"""
+# From GPT
+class AngerTracker:
+    def __init__(self):
+        self.current_anger = -5
+    
+    def track(self, anger_change):
+        self.current_anger += anger_change
+        return self.current_anger
+
+tracker = AngerTracker()
+
+
 # Constantly running in one thread
 
 def mood_management(current_anger):
     # Really stupid way to make this wait but it is testing rn
-    time.sleep(5)
+    time.sleep(4)
     print (f"Running mood_management, current mood is {current_anger}")
-    if current_anger < 5:
-        mood_decay(anger_tracker(0))
+    if current_anger > 4:
+        mood_decay(tracker.current_anger)
         # activate_timeout
-        mood_management(anger_tracker(0))
-    elif current_anger >= 0:
+        mood_management(tracker.current_anger)
+    elif current_anger <= 0:
+        mood_decay(tracker.current_anger)
         # end_timeout
-        mood_management(anger_tracker(0))
+        mood_management(tracker.current_anger)
     else:
-        mood_decay(anger_tracker(0))
-        mood_management(anger_tracker(0))
+        mood_decay(tracker.current_anger)
+        mood_management(tracker.current_anger)
 
-threading.Thread(target=mood_management, args=(anger_tracker(0),)).start()
+threading.Thread(target=mood_management, args=(tracker.current_anger,)).start()
 
 client.run(secret.token)
