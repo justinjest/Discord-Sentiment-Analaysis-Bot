@@ -16,13 +16,15 @@ openai_client = OpenAI(
     api_key = secret.project_id
 )
 # Keeps track of anger and is critical function for this program
-# From GPT
+# From GPT I got the idea to use classes to track things outside of 
+# the scope of a function
 class AngerTracker:
     def __init__(self):
-        self.current_anger = -4.0
+        self.current_anger = 0.0
     
     def track(self, anger_change: float) -> float:
         self.current_anger += anger_change
+        self.current_anger = round(self.current_anger, 1)
         return self.current_anger
 
 tracker = AngerTracker()
@@ -62,7 +64,8 @@ def slow_mode_sensor():
     elif tracker.current_anger >= 0:
         slow.toggle(False)
     time.sleep(10) 
-    slow_mode_sensor() 
+    slow_mode_sensor()
+
 # OpenAI functions
 def get_openai_response(input:str) -> float:
     # TODO improve prompt to something slightly cleaner
@@ -97,6 +100,8 @@ async def on_ready():
 
 @client.event
 async def on_message(message):  
+    helpful_messages = {"$mood": f"Current mood is {tracker.current_anger}",
+                        "$help": "I help turn the server into slow mode when people get angry. Use $mood for current mood"}
     if message.author == client.user:
         return
     else:
@@ -106,16 +111,18 @@ async def on_message(message):
             if slow.slow_mode == True:
                 await activate_timeout(message.channel)
             elif slow.slow_mode == False:
-                await end_timeout(message.channel)
-            if message.author == client.user:
-                return
-        else:
-            response = get_openai_response(message.content)
-            try: 
-                tracker.track(float(response))
-                print(f"New current_anger is {tracker.current_anger}")
-            except TypeError:
-                await message.channel.send("Error with message content not interagable.")
+                await end_timeout(message.channel) 
+                
+        for key in helpful_messages:
+            if message.content == key:
+                await message.channel.send(helpful_messages[key])
+            return
+        response = get_openai_response(message.content)
+        try: 
+            tracker.track(float(response))
+            print(f"New current_anger is {tracker.current_anger}")
+        except TypeError:
+            await message.channel.send("Error with message content not interagable.")
 
 
 
