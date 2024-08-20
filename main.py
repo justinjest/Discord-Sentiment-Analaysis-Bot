@@ -19,62 +19,61 @@ openai_client = OpenAI(
 # From GPT
 class AngerTracker:
     def __init__(self):
-        self.current_anger = 0
+        self.current_anger = -4.0
     
-    def track(self, anger_change):
+    def track(self, anger_change: float) -> float:
         self.current_anger += anger_change
         return self.current_anger
 
 tracker = AngerTracker()
 
-class slowMode:
+class SlowMode:
     def __init__(self):
         self.slow_mode = False
-
-    def slow_mode_change(self, slow_mode_on):
+        self.latch = False
+    def toggle(self, slow_mode_on: bool):
         self.slow_mode = slow_mode_on
-
-slow = slowMode()
+slow = SlowMode()
 
         
 # mood functions
-def mood_decay(current_anger: float) -> float:
+def mood_decay() -> float:
     # print ("Mood decay active")
-    if tracker.current_anger > 0:
+    if tracker.current_anger > -4:
         # print ("mood decays down")
         tracker.track(-.1) 
     elif tracker.current_anger < 0:
         # print ("mood decays up") 
         tracker.track(.1)
-    return current_anger
+    return tracker.current_anger
 
 # Constantly running in one thread
-def mood_management(current_anger):
-    print (f"Running mood_management, current mood is {current_anger}")
+def mood_management():
+    print (f"Running mood_management, current mood is {tracker.current_anger}")
     # Really stupid way to make this wait but it is testing rn
-    time.sleep(60)
-    if current_anger < -4:
-        print ("Mood below -4")
-        mood_decay(tracker.current_anger)
-        slow.slow_mode_change(True)
-        mood_management(tracker.current_anger)
-    elif current_anger >= 0:
-        mood_decay(tracker.current_anger)
-        slow.slow_mode_change(False) 
-        mood_management(tracker.current_anger)
-    else:
-        mood_decay(tracker.current_anger)
-        mood_management(tracker.current_anger)
+    time.sleep(60) 
+    mood_decay()
+    mood_management()
 
+def slow_mode_sensor():
+    print(f"Slow_mode_sensor is at {tracker.current_anger}")
+    if tracker.current_anger <= -4:
+        slow.toggle(True)
+    elif tracker.current_anger >= 0:
+        slow.toggle(False)
+    time.sleep(10) 
+    slow_mode_sensor() 
 # OpenAI functions
 def get_openai_response(input:str) -> float:
     # TODO improve prompt to something slightly cleaner
     completion = openai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4",
         messages=[
+            {"role": "system", "content":"You are a sentiment analyzer. Your task is to evaluate the tone of a message and provide a score between -1 and 1 based on its emotional content. Follow these guidelines: Score of 1: Assign this to messages that are very helpful, positive, or happy. Score between 0 and 1: Assign this to messages that are somewhat helpful or mildly positive. Score of 0: Assign this to neutral messages, which are neither positive nor negative. Score between -1 and 0: Assign this to messages that are somewhat angry, frustrated, or mildly negative. Score of -1: Assign this to messages that are very angry, frustrated, or rude. Your response should be a single floating-point number, with no additional text."},
             {
                 "role": "user",
-                "content": "You will rank all messages you receive with a score from -1 to 1. You will rank helpful, or happy messages with a score of 1. You will rank angry, frustrated, or rude messages with a score of -1. You will rank it 0 if a message is neither. You will rank messages between 1 and 0 if they are somewhat helpful, you will rank a message between 0 and -1 if it is somewhat angry. You will provide no response except for a single float.",
+                "content": input,
+                "temperature": "0.03"
             },
         ],
     )
@@ -89,7 +88,6 @@ async def activate_timeout(channel_name):
 async def end_timeout(channel_name):
     print ("Timeout ended")
     await channel_name.edit(slowmode_delay=0)
-    await channel_name.send("Slowmode turned off")
     
 
 # constantly running in another thread
@@ -98,23 +96,29 @@ async def on_ready():
     print(f'We have logged in as {client.user}')
 
 @client.event
-async def on_message(message):
+async def on_message(message):  
     if message.author == client.user:
         return
     else:
-        response = get_openai_response(message.content)
-        await message.channel.send(get_openai_response(response))
-        try: 
-            tracker.track(float(response))
-            print(f"New current_anger is {tracker.current_anger}")
-        except TypeError:
-            await message.channel.send("Error with message content not interagable.")
-    print (f"Slow mode is currently {slow.slow_mode}")
-    if slow.slow_mode == True:
-        await activate_timeout(message.channel)
-    elif slow.slow_mode == False:
-        await end_timeout(message.channel)
+        if slow.latch != slow.slow_mode:
+            print(f"Latch is {slow.latch}, toggle is {slow.slow_mode}")
+            slow.latch = slow.slow_mode
+            if slow.slow_mode == True:
+                await activate_timeout(message.channel)
+            elif slow.slow_mode == False:
+                await end_timeout(message.channel)
+            if message.author == client.user:
+                return
+        else:
+            response = get_openai_response(message.content)
+            try: 
+                tracker.track(float(response))
+                print(f"New current_anger is {tracker.current_anger}")
+            except TypeError:
+                await message.channel.send("Error with message content not interagable.")
 
 
-threading.Thread(target=mood_management, args=(tracker.current_anger,)).start()
+
+threading.Thread(target=mood_management).start()
+threading.Thread(target=slow_mode_sensor).start()
 client.run(secret.token)
