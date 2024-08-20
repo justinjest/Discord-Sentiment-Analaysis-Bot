@@ -124,8 +124,7 @@ async def on_message(message):
         except TypeError:
             await message.channel.send("Error with message content not interagable.")
 
-
-
-threading.Thread(target=mood_management).start()
-threading.Thread(target=slow_mode_sensor).start()
-client.run(secret.token)
+if __name__ == '__main__':
+    threading.Thread(target=mood_management).start()
+    threading.Thread(target=slow_mode_sensor).start()
+    client.run(secret.token)
