@@ -41,12 +41,14 @@ slow = SlowMode()
 # mood functions
 def mood_decay() -> float:
     # print ("Mood decay active")
-    if tracker.current_anger > -4:
+    if tracker.current_anger > 0:
         # print ("mood decays down")
         tracker.track(-.1) 
     elif tracker.current_anger < 0:
         # print ("mood decays up") 
         tracker.track(.1)
+    else:
+        tracker.track(0)
     return tracker.current_anger
 
 # Constantly running in one thread
@@ -61,8 +63,10 @@ def slow_mode_sensor():
     print(f"Slow_mode_sensor is at {tracker.current_anger}")
     if tracker.current_anger <= -4:
         slow.toggle(True)
+        print(f"Slow mode toggle is now {slow.toggle}")
     elif tracker.current_anger >= 0:
         slow.toggle(False)
+        print(f"Slow mode toggle is now {slow.toggle}")
     time.sleep(10) 
     slow_mode_sensor()
 
@@ -116,8 +120,8 @@ async def on_message(message):
         for key in helpful_messages:
             if message.content == key:
                 await message.channel.send(helpful_messages[key])
-            return
         response = get_openai_response(message.content)
+        print (f"{message.content} has a sentiment of {response}")
         try: 
             tracker.track(float(response))
             print(f"New current_anger is {tracker.current_anger}")
