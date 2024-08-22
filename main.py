@@ -63,10 +63,10 @@ def slow_mode_sensor():
     print(f"Slow_mode_sensor is at {tracker.current_anger}")
     if tracker.current_anger <= -4:
         slow.toggle(True)
-        print(f"Slow mode toggle is now {slow.toggle}")
+        print(f"Slow mode toggle is now {slow.slow_mode}")
     elif tracker.current_anger >= 0:
         slow.toggle(False)
-        print(f"Slow mode toggle is now {slow.toggle}")
+        print(f"Slow mode toggle is now {slow.slow_mode}")
     time.sleep(10) 
     slow_mode_sensor()
 
